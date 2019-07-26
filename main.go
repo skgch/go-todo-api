@@ -1,10 +1,14 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/ant0ine/go-json-rest/rest"
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/lestrrat/go-jwx/jwk"
 	infra "github.com/skgch/go-todo-api/infrastructure"
 	models "github.com/skgch/go-todo-api/models"
 )
@@ -21,6 +25,7 @@ func main() {
 		rest.Get("/todos/:id", GetTodo),
 		rest.Post("/todos", PostTodo),
 		rest.Delete("/todos/:id", DeleteTodo),
+		rest.Get("/debug", Debug),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -65,4 +70,46 @@ func DeleteTodo(w rest.ResponseWriter, r *rest.Request) {
 	repo := infra.NewTodoRepository()
 	repo.Delete(id)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func Debug(w rest.ResponseWriter, r *rest.Request) {
+	tokenString := r.Header.Get("Authorization")
+	claims, err := parseToken(tokenString)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(claims["email"])
+}
+
+func parseToken(tokenString string) (jwt.MapClaims, error) {
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Cognito UserPools の署名アルゴリズムはRS256
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return "", fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		set, err := jwk.FetchHTTP("https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_EzvKreJ2L/.well-known/jwks.json")
+		if err != nil {
+			return nil, err
+		}
+
+		keyID, ok := token.Header["kid"].(string)
+		if !ok {
+			return nil, errors.New("expecting JWT header to have string kid")
+		}
+
+		if key := set.LookupKeyID(keyID); len(key) == 1 {
+			return key[0].Materialize()
+		}
+		return nil, errors.New("unable to find key")
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, nil
+	}
+	return nil, errors.New("token is invalid")
 }
