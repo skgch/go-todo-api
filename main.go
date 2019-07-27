@@ -36,8 +36,25 @@ func main() {
 }
 
 func GetTodos(w rest.ResponseWriter, r *rest.Request) {
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		rest.Error(w, "user_id required", http.StatusBadRequest)
+		return
+	}
+
+	tokenString := r.Header.Get("Authorization")
+	craims, err := parseToken(tokenString)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if craims["email"] != userID {
+		rest.Error(w, "invalid user_id", http.StatusForbidden)
+		return
+	}
+
 	repo := infra.NewTodoRepository()
-	todos := repo.FindAll()
+	todos := repo.FindByUserID(userID)
 	w.WriteJson(todos)
 }
 

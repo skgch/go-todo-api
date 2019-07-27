@@ -29,6 +29,12 @@ func (r *TodoRepository) FindAll() *[]models.Todo {
 	return &todos
 }
 
+func (r *TodoRepository) FindByUserID(userID string) *[]models.Todo {
+	todos := []models.Todo{}
+	Db.Where(&models.Todo{UserID: userID}).Find(&todos)
+	return &todos
+}
+
 func (r *TodoRepository) Create(todo *models.Todo) *models.Todo {
 	Db.Create(todo)
 	return todo

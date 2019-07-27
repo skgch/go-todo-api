@@ -7,6 +7,7 @@ import (
 type TodoRepository interface {
 	FindById(id string) *models.Todo
 	FindAll() *[]models.Todo
+	FindByUserID(userID string) *[]models.Todo
 	Create(todo *models.Todo) *models.Todo
 	Delete(id string)
 }
