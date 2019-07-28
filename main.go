@@ -59,6 +59,13 @@ func GetTodos(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func GetTodo(w rest.ResponseWriter, r *rest.Request) {
+	tokenString := r.Header.Get("Authorization")
+	craims, err := parseToken(tokenString)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	id := r.PathParam("id")
 	repo := infra.NewTodoRepository()
 	todo := repo.FindById(id)
@@ -66,7 +73,12 @@ func GetTodo(w rest.ResponseWriter, r *rest.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		rest.NotFound(w, r)
 		return
+	} else if todo.UserID != craims["email"] {
+		w.WriteHeader(http.StatusForbidden)
+		rest.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
+
 	w.WriteJson(todo)
 }
 
