@@ -83,15 +83,28 @@ func GetTodo(w rest.ResponseWriter, r *rest.Request) {
 }
 
 func PostTodo(w rest.ResponseWriter, r *rest.Request) {
-	todo := models.Todo{}
-	err := r.DecodeJsonPayload(&todo)
+	tokenString := r.Header.Get("Authorization")
+	craims, err := parseToken(tokenString)
 	if err != nil {
 		rest.Error(w, err.Error(), http.StatusBadRequest)
-	} else {
-		repo := infra.NewTodoRepository()
-		todo := repo.Create(&todo)
-		w.WriteJson(todo)
+		return
 	}
+
+	todo := models.Todo{}
+	err = r.DecodeJsonPayload(&todo)
+	if err != nil {
+		rest.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if todo.UserID != craims["email"] {
+		w.WriteHeader(http.StatusForbidden)
+		rest.Error(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	repo := infra.NewTodoRepository()
+	w.WriteJson(repo.Create(&todo))
 }
 
 func DeleteTodo(w rest.ResponseWriter, r *rest.Request) {
